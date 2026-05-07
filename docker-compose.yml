@@ -4,8 +4,25 @@ services:
   omr-web:
     build: .
     container_name: nota10_omr_app
-    ports:
-      - "80:5000"
     restart: always
     environment:
       - FLASK_ENV=production
+    # The ports section is removed because Caddy will proxy traffic to port 5000 internally.
+
+  caddy:
+    image: caddy:2
+    container_name: nota10_caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - omr-web
+
+volumes:
+  caddy_data:
+  caddy_config:

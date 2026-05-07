@@ -1,0 +1,3 @@
+nota10.fmind.app {
+    reverse_proxy omr-web:5000
+}
