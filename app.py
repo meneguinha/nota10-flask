@@ -8,19 +8,26 @@ import cv2
 import json
 import uuid
 import time
+import shutil
 from flask import Flask, render_template, request, send_file, jsonify
 from omr_generator import generate_omr_sheet
 from omr_processor import process_omr_image
 
 app = Flask(__name__)
-RESULTS_CACHE = {}
+RESULTS_DIR = 'results'
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
 @app.route('/cleanup', methods=['POST'])
 def cleanup():
     data = request.get_json(silent=True) or {}
     result_id = data.get('result_id')
-    if result_id and result_id in RESULTS_CACHE:
-        del RESULTS_CACHE[result_id]
+    if result_id:
+        dir_path = os.path.join(RESULTS_DIR, result_id)
+        if os.path.exists(dir_path):
+            try:
+                shutil.rmtree(dir_path)
+            except Exception:
+                pass
     return jsonify({'success': True})
 
 @app.route('/')
@@ -184,31 +191,37 @@ def process_exams():
 
         # Auto-cleanup old entries (older than 1 hour)
         current_time = time.time()
-        keys_to_delete = [k for k, v in RESULTS_CACHE.items() if current_time - v.get('timestamp', current_time) > 3600]
-        for k in keys_to_delete:
-            del RESULTS_CACHE[k]
+        for folder_name in os.listdir(RESULTS_DIR):
+            folder_path = os.path.join(RESULTS_DIR, folder_name)
+            if os.path.isdir(folder_path):
+                try:
+                    if current_time - os.path.getmtime(folder_path) > 3600:
+                        shutil.rmtree(folder_path)
+                except Exception:
+                    pass
 
-        # Save to memory cache instead of ZIP
+        # Save to disk instead of memory
         result_id = str(uuid.uuid4())
-        RESULTS_CACHE[result_id] = {'timestamp': current_time}
+        result_folder = os.path.join(RESULTS_DIR, result_id)
+        os.makedirs(result_folder, exist_ok=True)
         
         # 1. Excel Relatorio
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+        excel_path = os.path.join(result_folder, 'relatorio.xlsx')
+        with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Resultados Completos')
-        RESULTS_CACHE[result_id]['relatorio'] = excel_buffer.getvalue()
         
         # 2. Excel Class List (if exists)
         has_class_list = False
         if df_class_with_grades is not None:
             has_class_list = True
-            excel_class_buffer = io.BytesIO()
-            with pd.ExcelWriter(excel_class_buffer, engine='openpyxl') as writer:
+            lista_path = os.path.join(result_folder, 'lista.xlsx')
+            with pd.ExcelWriter(lista_path, engine='openpyxl') as writer:
                 df_class_with_grades.to_excel(writer, index=False, sheet_name='Lista com Notas')
-            RESULTS_CACHE[result_id]['lista'] = excel_class_buffer.getvalue()
             
         # 3. Images ZIP
-        RESULTS_CACHE[result_id]['imagens'] = images_zip_buffer.getvalue()
+        zip_path = os.path.join(result_folder, 'imagens.zip')
+        with open(zip_path, 'wb') as f:
+            f.write(images_zip_buffer.getvalue())
 
         return jsonify({
             'success': True,
@@ -221,19 +234,24 @@ def process_exams():
 
 @app.route('/download/<result_id>/<file_type>')
 def download_file(result_id, file_type):
-    if result_id not in RESULTS_CACHE:
+    result_folder = os.path.join(RESULTS_DIR, result_id)
+    if not os.path.exists(result_folder):
         return "Arquivo expirou ou não encontrado.", 404
         
-    data = RESULTS_CACHE[result_id]
-    
     if file_type == 'relatorio':
-        return send_file(io.BytesIO(data['relatorio']), as_attachment=True, download_name='relatorio_notas_omr.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    elif file_type == 'lista' and 'lista' in data:
-        return send_file(io.BytesIO(data['lista']), as_attachment=True, download_name='lista_alunos_com_notas.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        file_path = os.path.join(result_folder, 'relatorio.xlsx')
+        if os.path.exists(file_path):
+            return send_file(file_path, as_attachment=True, download_name='relatorio_notas_omr.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    elif file_type == 'lista':
+        file_path = os.path.join(result_folder, 'lista.xlsx')
+        if os.path.exists(file_path):
+            return send_file(file_path, as_attachment=True, download_name='lista_alunos_com_notas.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     elif file_type == 'imagens':
-        return send_file(io.BytesIO(data['imagens']), as_attachment=True, download_name='provas_corrigidas.zip', mimetype='application/zip')
+        file_path = os.path.join(result_folder, 'imagens.zip')
+        if os.path.exists(file_path):
+            return send_file(file_path, as_attachment=True, download_name='provas_corrigidas.zip', mimetype='application/zip')
     
-    return "Tipo de arquivo inválido", 400
+    return "Tipo de arquivo inválido ou não encontrado.", 400
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
