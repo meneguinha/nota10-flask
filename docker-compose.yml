@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  omr-web:
+    build: .
+    container_name: nota10_omr_app
+    ports:
+      - "80:5000"
+    restart: always
+    environment:
+      - FLASK_ENV=production

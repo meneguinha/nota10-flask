@@ -1,0 +1,14 @@
+.git
+__pycache__/
+*.pyc
+venv/
+env/
+.env
+.venv/
+.gemini/
+*.pdf
+*.xlsx
+*.zip
+*.png
+*.jpg
+!static/images/qrcode-pix.png

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nota 10 - Correção Automática</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.3">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-container">
+            <h1><i class="ph-fill ph-check-circle"></i> Nota 10</h1>
+            <p>Transforme provas digitalizadas em relatórios precisos em segundos.</p>
+        </div>
+    </header>
+
+    <main class="app-main">
+        <div class="tabs">
+            <button class="tab-btn active" data-target="tab-gerador"><i class="ph ph-printer"></i> Gerador de Provas</button>
+            <button class="tab-btn" data-target="tab-correcao"><i class="ph ph-check-square"></i> Correção e Upload</button>
+            <button class="tab-btn" data-target="tab-ajuda"><i class="ph ph-question"></i> Ajuda & Dicas</button>
+        </div>
+
+        <section id="tab-gerador" class="tab-content active glass-card">
+            <h2>Configuração Dinâmica da Matriz</h2>
+            <p>Preencha os campos abaixo para gerar o gabarito oficial (PDF).</p>
+
+            <form id="form-gerador" action="/generate_matrix" method="POST">
+                <div class="form-grid">
+                    <div class="input-group">
+                        <label for="professor_name">Nome do Professor</label>
+                        <input type="text" id="professor_name" name="professor_name">
+                    </div>
+                    <div class="input-group">
+                        <label for="subject_name">Disciplina</label>
+                        <input type="text" id="subject_name" name="subject_name">
+                    </div>
+                    <div class="input-group">
+                        <label for="school_name">Colégio</label>
+                        <input type="text" id="school_name" name="school_name">
+                    </div>
+                    <div class="input-group">
+                        <label for="num_questions">Número de Questões</label>
+                        <input type="number" id="num_questions" name="num_questions" min="1" max="60" value="10">
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary"><i class="ph ph-file-pdf"></i> Gerar Matriz (PDF)</button>
+            </form>
+        </section>
+
+        <section id="tab-correcao" class="tab-content glass-card">
+            <h2>Gestão de Arquivos e Correção</h2>
+
+            <div class="step-card">
+                <h3>1. Gabarito Oficial</h3>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="modo_gabarito" value="grid" checked> Grade Rápida
+                    </label>
+                    <label>
+                        <input type="radio" name="modo_gabarito" value="text"> Texto Livre (Copiar e Colar)
+                    </label>
+                </div>
+
+                <div id="gabarito-grid-container" class="gabarito-mode active">
+                    <div class="input-group">
+                        <label for="qtd_questoes_gabarito">Quantidade de Questões</label>
+                        <input type="number" id="qtd_questoes_gabarito" min="1" max="60" value="10">
+                    </div>
+                    <div id="grid-inputs" class="grid-inputs"></div>
+                </div>
+
+                <div id="gabarito-text-container" class="gabarito-mode">
+                    <div class="input-group">
+                        <label for="gabarito_text">Chave de Correção</label>
+                        <textarea id="gabarito_text" placeholder="Ex: 1 - A, 2 - C&#10;3 - D"></textarea>
+                    </div>
+                </div>
+                <button id="btn-confirmar-gabarito" class="btn-secondary">Confirmar Gabarito</button>
+                <div id="feedback-gabarito" class="feedback-msg"></div>
+            </div>
+
+            <div class="step-card">
+                <h3>2. Lista de Turmas (Opcional)</h3>
+                <div style="background: #f1f5f9; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; border-left: 4px solid var(--secondary-color);">
+                    <p style="margin-bottom: 0.5rem; font-size: 0.9rem;">
+                        <strong>Formato esperado do arquivo:</strong>
+                    </p>
+                    <ul style="margin-left: 1.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                        <li>O arquivo (Excel ou CSV) <strong>precisa</strong> ter as colunas <code>ID Turma</code> e <code>ID Aluno</code> para o cruzamento de dados.</li>
+                        <li>Colunas adicionais como <code>Nome do Aluno</code> e <code>E-mail</code> são opcionais e, se presentes, serão automaticamente inseridas no relatório de notas final.</li>
+                    </ul>
+                </div>
+                <input type="file" id="class_list_file" accept=".csv, .xlsx">
+            </div>
+
+            <div class="step-card">
+                <h3>3. Upload de Respostas</h3>
+                <div class="input-group">
+                    <label for="nota_maxima">Nota Máxima da Prova</label>
+                    <input type="number" id="nota_maxima" step="0.5" min="0" max="100" value="10.0">
+                </div>
+                <div class="upload-area">
+                    <input type="file" id="exam_files" accept=".pdf, .png, .jpg, .jpeg" multiple>
+                </div>
+                <button id="btn-processar" class="btn-primary w-full"><i class="ph ph-rocket-launch"></i> Iniciar Processamento e Gerar Resultados</button>
+                
+                <div id="loading-overlay" class="hidden">
+                    <div class="spinner" id="loading-spinner"></div>
+                    <p id="loading-text">Processando... Isso pode levar alguns instantes.</p>
+                    <div id="progress-container" class="hidden">
+                        <div id="progress-bar"></div>
+                    </div>
+                </div>
+                <div id="success-message" class="feedback-msg success hidden" style="margin-top: 1rem;">
+                    ✨ Processamento concluído! Escolha quais arquivos deseja baixar:
+                </div>
+                
+                <div id="download-actions" class="hidden" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <a id="btn-download-relatorio" href="#" download="relatorio_notas_omr.xlsx" target="_blank" class="btn-primary" style="background-color: #3b82f6;"><i class="ph ph-file-xls"></i> Baixar Relatório Completo (Excel)</a>
+                    <a id="btn-download-lista" href="#" download="lista_alunos_com_notas.xlsx" target="_blank" class="btn-primary hidden" style="background-color: #0ea5e9;"><i class="ph ph-list-numbers"></i> Baixar Lista com Notas (Excel)</a>
+                    <a id="btn-download-imagens" href="#" download="provas_corrigidas.zip" target="_blank" class="btn-primary" style="background-color: #64748b;"><i class="ph ph-file-zip"></i> Baixar Imagens das Provas (ZIP)</a>
+                </div>
+            </div>
+        </section>
+        <section id="tab-ajuda" class="tab-content glass-card">
+            <h2>Guia de Uso para Professores</h2>
+            <p>Siga estas instruções para garantir o funcionamento perfeito do sistema de correção.</p>
+
+            <div class="step-card">
+                <h3><i class="ph ph-printer"></i> 1. Impressão e Distribuição</h3>
+                <ul style="margin-left: 1.5rem; line-height: 1.8; color: var(--text-muted);">
+                    <li>Use a aba <strong>"Gerador de Provas"</strong> para criar sua matriz em PDF. Não altere as margens do PDF gerado.</li>
+                    <li>Imprima em papel branco (A4), preferencialmente em alta qualidade para que os quadrados pretos nos cantos (marcadores) fiquem bem visíveis.</li>
+                    <li>Oriente os alunos a preencherem os campos de <strong>Turma</strong> e <strong>Aluno</strong> usando apenas números.</li>
+                </ul>
+            </div>
+
+            <div class="step-card">
+                <h3><i class="ph ph-pencil-simple"></i> 2. Preenchimento pelos Alunos</h3>
+                <ul style="margin-left: 1.5rem; line-height: 1.8; color: var(--text-muted);">
+                    <li>O preenchimento deve ser feito com caneta de tinta <strong>azul escuro ou preta</strong>. Lápis claro pode não ser detectado corretamente.</li>
+                    <li>As "bolinhas" devem ser preenchidas por completo (pintadas). Apenas um "X" fino ou traço pode causar falhas na leitura automática.</li>
+                    <li>Evite rasuras, dobras ou rasgos nas bordas das folhas, pois o sistema precisa enxergar os 4 cantos pretos da prova para alinhar a imagem.</li>
+                </ul>
+            </div>
+
+            <div class="step-card">
+                <h3><i class="ph ph-scanner"></i> 3. Digitalização (Scanner)</h3>
+                <ul style="margin-left: 1.5rem; line-height: 1.8; color: var(--text-muted);">
+                    <li>Digitalize as folhas em <strong>PDF ou Imagem (JPG/PNG)</strong>. Se for PDF, pode conter várias folhas no mesmo arquivo.</li>
+                    <li>Digitalize as provas o mais <strong>reto (alinhado)</strong> possível. O sistema corrige pequenas inclinações, mas folhas de ponta-cabeça não serão lidas.</li>
+                    <li>Evite sombras fortes sobre o papel na hora do escaneamento.</li>
+                </ul>
+            </div>
+
+            <div class="step-card">
+                <h3><i class="ph ph-file-csv"></i> 4. Lista de Alunos (Opcional)</h3>
+                <ul style="margin-left: 1.5rem; line-height: 1.8; color: var(--text-muted);">
+                    <li>Se você quiser que o relatório final já saia com o nome dos alunos (e não apenas os números), suba uma planilha no Passo 2 da aba de Correção.</li>
+                    <li>Obrigatório ter as colunas escritas exatamente como: <code>ID Turma</code> e <code>ID Aluno</code>.</li>
+                    <li>Você pode incluir colunas como <code>Nome</code> e <code>Email</code> e elas aparecerão automaticamente na tabela corrigida.</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <div class="footer-content">
+            <div class="footer-info">
+                <p>Desenvolvido com <i class="ph-fill ph-heart" style="color: #ef4444;"></i> por <strong>Felipe Nunes Menegotto</strong></p>
+                <p><i class="ph-fill ph-github-logo"></i> <a href="https://github.com/meneguinha" target="_blank">github.com/meneguinha</a></p>
+                <p><i class="ph-fill ph-globe"></i> <a href="https://www.felipemenegotto.com.br" target="_blank">www.felipemenegotto.com.br</a></p>
+            </div>
+            <div class="footer-donate">
+                <p><i class="ph-fill ph-coffee"></i> Gostou do sistema? Apoie com um PIX!</p>
+                <img src="{{ url_for('static', filename='images/qrcode-pix.png') }}" alt="QR Code PIX" class="pix-qrcode">
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=1.3"></script>
+</body>
+</html>

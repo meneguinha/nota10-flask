@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VS Code / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Gemini / Local
+.gemini/
+scratch/
+
+# Test files and output files
+*.pdf
+*.xlsx
+*.zip
+*.csv
+!static/images/qrcode-pix.png
+
+# Keep templates empty or specific
+# Remove temporary backups
+~$*.xlsx
