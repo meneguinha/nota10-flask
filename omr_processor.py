@@ -78,7 +78,7 @@ def process_omr_image(image_bytes, num_questions, alternatives_format, answer_ke
     # ----- DIMENSÕES ALVO (A4 em Alta Resolução) -----
     pdf_width = 595.27
     pdf_height = 841.89
-    scale = 3.0 # Fator de escala para manter a qualidade alta ao fazer warp
+    scale = 2.0 # Fator de escala reduzido para economia de memória e performance
     width = int(pdf_width * scale)
     height = int(pdf_height * scale)
     

@@ -127,18 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
         progressContainer.classList.remove('hidden');
         btnProcessar.disabled = true;
 
-        // Simulate progress bar (assume ~2 seconds per file)
-        let estimatedTime = examFiles.length * 2000;
-        let progress = 0;
         progressBar.style.width = '0%';
-        
-        let progressInterval = setInterval(() => {
-            // max simulated progress is 90%
-            if (progress < 90) {
-                progress += Math.max(1, 90 / (estimatedTime / 200));
-                progressBar.style.width = Math.min(progress, 90) + '%';
-            }
-        }, 200);
+        const loadingText = document.getElementById('loading-text');
+        loadingText.innerText = "Iniciando processamento...";
 
         try {
             const response = await fetch('/process_exams', {
@@ -148,45 +139,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || "Erro ao processar provas.");
+                throw new Error(errorData.error || "Erro ao iniciar processamento.");
             }
 
             const resultData = await response.json();
-            currentResultId = resultData.result_id;
-
-            // Finish progress
-            clearInterval(progressInterval);
-            progressBar.style.width = '100%';
+            const taskId = resultData.task_id;
             
-            // Wait briefly before showing success and buttons to let UI update
-            setTimeout(() => {
-                loadingOverlay.classList.add('hidden');
-                successMessage.classList.remove('hidden');
-                
-                const downloadActions = document.getElementById('download-actions');
-                downloadActions.classList.remove('hidden');
-                
-                const btnRelatorio = document.getElementById('btn-download-relatorio');
-                const btnLista = document.getElementById('btn-download-lista');
-                const btnImagens = document.getElementById('btn-download-imagens');
-                
-                btnRelatorio.href = `/download/${resultData.result_id}/relatorio`;
-                btnImagens.href = `/download/${resultData.result_id}/imagens`;
-                
-                if (resultData.has_class_list) {
-                    btnLista.href = `/download/${resultData.result_id}/lista`;
-                    btnLista.classList.remove('hidden');
-                } else {
-                    btnLista.classList.add('hidden');
+            // Polling
+            let pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch(`/status/${taskId}`);
+                    if (!statusRes.ok) throw new Error("Erro ao checar status.");
+                    const statusData = await statusRes.json();
+                    
+                    if (statusData.status === "processing") {
+                        progressBar.style.width = statusData.progress + '%';
+                        loadingText.innerText = `Processando: ${statusData.current} de ${statusData.total} páginas...`;
+                    } else if (statusData.status === "completed") {
+                        clearInterval(pollInterval);
+                        progressBar.style.width = '100%';
+                        loadingText.innerText = "Finalizando arquivos...";
+                        
+                        currentResultId = taskId;
+                        
+                        setTimeout(() => {
+                            loadingOverlay.classList.add('hidden');
+                            successMessage.classList.remove('hidden');
+                            
+                            const downloadActions = document.getElementById('download-actions');
+                            downloadActions.classList.remove('hidden');
+                            
+                            const btnRelatorio = document.getElementById('btn-download-relatorio');
+                            const btnLista = document.getElementById('btn-download-lista');
+                            const btnImagens = document.getElementById('btn-download-imagens');
+                            
+                            btnRelatorio.href = `/download/${taskId}/relatorio`;
+                            btnImagens.href = `/download/${taskId}/imagens`;
+                            
+                            if (statusData.has_class_list) {
+                                btnLista.href = `/download/${taskId}/lista`;
+                                btnLista.classList.remove('hidden');
+                            } else {
+                                btnLista.classList.add('hidden');
+                            }
+                            
+                            btnProcessar.disabled = false;
+                        }, 500);
+                    } else if (statusData.status === "error") {
+                        clearInterval(pollInterval);
+                        throw new Error(statusData.error || "Erro interno no processamento.");
+                    }
+                } catch (err) {
+                    clearInterval(pollInterval);
+                    loadingOverlay.classList.add('hidden');
+                    alert(`Erro: ${err.message}`);
+                    btnProcessar.disabled = false;
                 }
-                
-            }, 500);
+            }, 1000);
 
         } catch (error) {
-            clearInterval(progressInterval);
             loadingOverlay.classList.add('hidden');
             alert(`Erro: ${error.message}`);
-        } finally {
             btnProcessar.disabled = false;
         }
     });
